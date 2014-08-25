@@ -8,26 +8,38 @@ _record_separator = b'\n'
 class GuessException(Exception):
     pass
 
+class Guesser(object):
+    def __init__(self, record_separator):
+        self.record_separator = record_separator
+        self._candidates = None
+        self.counter = Counter()
+
+    def addbyte(self, byte):
+        if byte == self.record_separator:
+            if self._candidates is None:
+                self._candidates = dict(self.counter)
+            else:
+                candidates = {}
+                for b, count in self._candidates.items():
+                    if count == self.counter[b]:
+                        candidates[b] = count
+                self._candidates = candidates
+            self.counter.clear()
+        else:
+            self.counter[byte] += 1
+
+    def candidates(self):
+        if self._candidates:
+            return list(self._candidates.keys())
+        return []
 
 def guessfieldseparator(byte_iter):
-    accumulated_counter = None
-    counter = Counter()
+    guesser = Guesser(_record_separator)
     for b in byte_iter:
-        if b == _record_separator:
-            if accumulated_counter is None:
-                accumulated_counter = dict(counter)
-            else:
-                new_accum = {}
-                for k, v in accumulated_counter.items():
-                    if v == counter[k]:
-                        new_accum[k] = v
-                if len(new_accum) == 1:
-                    for k in new_accum:
-                        return k
-                accumulated_counter = new_accum
-            counter = Counter()
-        else:
-            counter[b] += 1
+        guesser.addbyte(b)
+        candidates = guesser.candidates()
+        if len(candidates) == 1:
+            return candidates[0]
     raise GuessException()
 
 def guess(file_obj):
